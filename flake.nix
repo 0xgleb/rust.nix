@@ -3,6 +3,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     systems.url = "github:nix-systems/default";
     devenv.url = "github:cachix/devenv";
+    foundry.url = "github:shazow/foundry.nix/monthly";
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -20,6 +21,8 @@
       nixpkgs,
       devenv,
       systems,
+      foundry,
+      fenix,
       ...
     }@inputs:
     let
@@ -33,7 +36,10 @@
       devShells = forEachSystem (
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ foundry.overlay ];
+          };
         in
         {
           default = devenv.lib.mkShell {
@@ -41,16 +47,20 @@
             modules = [
               {
                 # https://devenv.sh/reference/options/
-                packages = with pkgs; [ cargo-watch ];
-
-                enterShell = "";
-                dotenv.enable = true;
+                packages = with pkgs; [
+                  cargo-watch
+                  foundry-bin
+                  solc
+                ];
 
                 languages.rust = {
                   enable = true;
                   channel = "stable";
-                  toolchain = inputs.fenix.packages.${pkgs.system}.latest;
+                  toolchain = fenix.packages.${pkgs.system}.latest;
                 };
+
+                difftastic.enable = true;
+                dotenv.disableHint = true;
               }
             ];
           };
